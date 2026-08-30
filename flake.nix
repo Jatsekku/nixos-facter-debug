@@ -1,14 +1,16 @@
 {
-  description = "Nix flake templaate for bash application";
+  description = "Wrappers for nixos-facter's nvd and nix-diff";
 
   # Flake inputs
   inputs = {
-    # Bash logger library
+    # Feature-rich, flexible logger utility for bash.
     bash-logger = {
       url = "github:Jatsekku/bash-logger";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+
+    # Nix Packages collection & NixOS.
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   };
 
   outputs =
@@ -26,8 +28,6 @@
             # Nixpkgs configured per system
             pkgs = import inputs.nixpkgs {
               inherit system;
-              # Allow usage of unfree packages
-              config.allowUnfree = true;
               # Apply overlays defined by flake itself
               overlays = [ self.overlays.default ];
             };
@@ -43,34 +43,54 @@
         let
           # Dependencies
           bash-logger = inputs.bash-logger.packages.${system}.default;
-          # Build package
-          bash-project-pkg = pkgs.callPackage ./nix/package.nix {
+
+          # Build package set
+          nixos-facter-debug-pkg = pkgs.callPackage ./nix/package.nix {
             inherit bash-logger;
           };
         in
         {
-          # Expose package
-          bash-project = bash-project-pkg;
-          default = bash-project-pkg;
+          # Expose packages
+          nixos-facter-debug-nvd = nixos-facter-debug-pkg.nvd;
+          nixos-facter-debug-nix-diff = nixos-facter-debug-pkg.nix-diff;
         }
       );
 
       # Inject packages via overlays
       overlays.default = final: prev: {
-        inherit (self.packages.${final.system}) bash-project;
+        inherit (self.packages.${final.system})
+          nixos-facter-debug-nvd
+          nixos-facter-debug-nix-diff
+          ;
       };
 
       # Provide NixOs modules
-      nixosModules = {
-        bash-project = import ./nix/module.nix;
-        default = self.nixosModules.bash-project;
+      nixosModules = rec {
+        nixos-facter-debug = { pkgs, lib, ... }: {
+          # Import the pure file directly here
+          imports = [ ./nix/module.nix ];
+
+          # Inject the default packages
+          hardware.facter-debug.package.nvd =
+            lib.mkDefault
+              self.packages.${pkgs.system}.nixos-facter-debug-nvd;
+          hardware.facter-debug.package.nix-diff =
+            lib.mkDefault
+              self.packages.${pkgs.system}.nixos-facter-debug-nix-diff;
+        };
+
+        # Alias default to the exact same module
+        default = nixos-facter-debug;
       };
 
       # Add Nix checks
       checks = forEachSupportedSystem (
         { pkgs, ... }:
         {
-          module-test = import ./nix/test/module-test.nix { inherit pkgs; };
+          module-test = import ./nix/test/module-test.nix {
+            inherit pkgs;
+            testModule = self.nixosModules.default;
+          };
         }
       );
 

@@ -1,22 +1,18 @@
-{ pkgs, ... }:
+{ pkgs, testModule, ... }:
 
 pkgs.testers.runNixOSTest {
-  name = "bash-project-module-test";
+  name = "nixos-facter-debug-module-test";
 
-  nodes.machine =
-    { pkgs, ... }:
-    {
-      imports = [
-        ../module.nix
-      ];
-
-      programs.bash-project.enable = true;
-    };
+  nodes.machine = { ... }: {
+    imports = [ testModule ];
+    hardware.facter-debug.enable = true;
+  };
 
   testScript = ''
     machine.wait_for_unit("multi-user.target")
 
-    # check package got installed
-    machine.succeed("which bash-project")
+    # Check package got installed
+    machine.succeed("which nixos-facter-nvd")
+    machine.succeed("which nixos-facter-nix-diff")
   '';
 }

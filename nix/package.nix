@@ -3,29 +3,39 @@ let
   # Path to external lib (bash-logger)
   bash-logger-scriptPath = bash-logger.passthru.scriptPath;
 
-  # Path to script
-  bash-project-scriptPath = ../src/hello.sh;
-  # Content of the sript
-  bash-project-scriptContent = builtins.readFile bash-project-scriptPath;
-in
-pkgs.writeShellApplication {
-  name = "bash-project";
-  text = ''
-    # Provide path to bash-logger library
-    export BASH_LOGGER_SH=${bash-logger-scriptPath}
+  common-scriptPath = ../src/common.sh;
+  nvd-scriptPath = ../src/nvd.sh;
+  nix-diff-scriptPath = ../src/nix-diff.sh;
 
-    ${bash-project-scriptContent}
-  '';
+  nvd-scriptContent = builtins.readFile nvd-scriptPath;
+  nix-diff-scriptContent = builtins.readFile nix-diff-scriptPath;
 
-  # Runtime dependencies for package
   runtimeInputs = [
-    pkgs.bash
     bash-logger
+    pkgs.bash
   ];
+in
+{
+  nvd = pkgs.writeShellApplication {
+    inherit runtimeInputs;
+    name = "nixos-facter-nvd";
+    text = ''
+      export BASH_LOGGER_SH=${bash-logger-scriptPath}
+      export NIXOS_FACTER_DEBUG_COMMON_SH=${common-scriptPath}
 
-  # Metdata propagation
-  passthru = {
-    # Expose path to script (usefull for shell "libraries")
-    scriptPath = bash-project-scriptPath;
+      ${nvd-scriptContent}
+    '';
+
+  };
+
+  nix-diff = pkgs.writeShellApplication {
+    inherit runtimeInputs;
+    name = "nixos-facter-nix-diff";
+    text = ''
+      export BASH_LOGGER_SH=${bash-logger-scriptPath}
+      export NIXOS_FACTER_DEBUG_COMMON_SH=${common-scriptPath}
+
+      ${nix-diff-scriptContent}
+    '';
   };
 }
